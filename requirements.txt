@@ -1,0 +1,12 @@
+# Add your Python dependencies here.
+# Install with: pip install -r requirements.txt
+#
+# Examples:
+#   requests==2.31.0
+#   PyYAML==6.0.1
+#
+# Testing and quality tools (required for CI):
+pytest>=7.4
+pytest-cov>=4.1
+pylint>=3.0
+black>=23.0

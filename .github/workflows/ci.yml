@@ -1,0 +1,134 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Lint and code quality
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint & Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # --- Bash: shellcheck ---------------------------------------------------
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck on Bash scripts
+        run: |
+          if find src/ -name "*.sh" -print0 | xargs -0 -r shellcheck; then
+            echo "shellcheck passed."
+          else
+            bash_count=$(find src/ -name "*.sh" | wc -l)
+            if [ "$bash_count" -eq 0 ]; then
+              echo "No Bash files found in src/ — skipping shellcheck."
+            else
+              exit 1
+            fi
+          fi
+
+      # --- Python: black + pylint ---------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pylint black
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Check formatting with black
+        run: |
+          python_files=$(find src/ -name "*.py" 2>/dev/null || true)
+          if [ -n "$python_files" ]; then
+            black --check src/
+          else
+            echo "No Python files found in src/ — skipping black."
+          fi
+
+      - name: Lint with pylint (minimum score 7.0)
+        run: |
+          python_files=$(find src/ -name "*.py" 2>/dev/null || true)
+          if [ -n "$python_files" ]; then
+            pylint src/ --fail-under=7.0
+          else
+            echo "No Python files found in src/ — skipping pylint."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Tests with coverage gate
+  # ---------------------------------------------------------------------------
+  test:
+    name: Tests & Coverage
+    runs-on: ubuntu-latest
+    needs: lint   # Only run tests if lint passes
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pytest pytest-cov
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run pytest with coverage
+        # Minimum required coverage is 70%. Add tests to src/ before submission.
+        run: |
+          if find src/ -name "test_*.py" -o -name "*_test.py" 2>/dev/null | grep -q .; then
+            pytest src/ --cov=src --cov-report=term-missing --cov-fail-under=70 -v
+          else
+            echo "Warning: no test files found in src/ — add tests before submission."
+            exit 0
+          fi
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: .coverage
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Build / integration check (add your own steps here)
+  # ---------------------------------------------------------------------------
+  # TODO: Add a third job specific to your project. Examples:
+  #
+  #   - Build and test your Docker image:
+  #       docker build -t my-tool .
+  #       docker run --rm my-tool --help
+  #
+  #   - Run an end-to-end integration scenario:
+  #       bash src/monitor.sh --dry-run
+  #       python src/analyzer.py --input sample_data/test.log
+  #
+  # Uncomment and adapt the template below:
+  #
+  # build:
+  #   name: Build & Integration
+  #   runs-on: ubuntu-latest
+  #   needs: test
+  #
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - name: TODO - add your build/integration steps here
+  #       run: echo "Replace this with your actual build or integration commands"

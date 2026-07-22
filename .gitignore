@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+.venv/
+venv/
+ENV/
+env/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.coveragerc
+.tox/
+
+# Linting
+.pylint.d/
+.mypy_cache/
+
+# Docker
+.docker/
+
+# Logs and output files
+*.log
+logs/
+reports/
+output/
+archive/
+
+# Secrets and credentials — NEVER commit these
+.env
+.env.*
+*.pem
+*.key
+*.secret
+secrets/
+credentials/
+config.local.yaml
+config.local.json
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
