@@ -20,8 +20,10 @@ set -euo pipefail
 # ------------------------------------------------------------------------------
 # Global constants — update paths to match your project layout
 # ------------------------------------------------------------------------------
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+readonly SCRIPT_NAME
 readonly LOG_DIR="${SCRIPT_DIR}/../logs"
 readonly LOG_FILE="${LOG_DIR}/${SCRIPT_NAME%.sh}.log"
 readonly DEFAULT_CONFIG="${SCRIPT_DIR}/../config.yaml"
@@ -30,6 +32,7 @@ readonly DEFAULT_CONFIG="${SCRIPT_DIR}/../config.yaml"
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'
+# shellcheck disable=SC2034  # reserved for future use
 readonly BLUE='\033[0;34m'
 readonly NC='\033[0m'
 
