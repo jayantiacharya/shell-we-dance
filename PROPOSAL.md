@@ -1,8 +1,8 @@
 # Final Capstone Proposal
 
 **CS 3030 - Scripting Languages**
-**Team Members:** [Name 1] (A#######) | [Name 2] (A#######)
-**Date:** YYYY-MM-DD
+**Team Members:** Jayanti Acharya (W01469558) | Omar Bustos (A#######) | Eric Zavala Moguel (A#######)
+**Date:** 2026-07-23
 
 > **Instructions:** Fill in every section below. Delete all instruction
 > comments (lines starting with `>`). Commit this file on a feature branch,
@@ -16,13 +16,13 @@
 ## Section 1: Problem Statement
 
 ### What problem does your tool solve?
-<!-- 2-4 sentences. Be specific. "Automate X because Y is currently painful/manual/error-prone." -->
+Checking the health of a local or containerized dev environment today means manually SSHing in and running a handful of commands (df, top, ps, docker ps, tailing logs) every time something feels off. Because it's manual, checks get skipped, and issues like a filling disk or a crashed container go unnoticed until something actually breaks. This tool automates that monitoring loop end-to-end and surfaces the results as a live dashboard, so no one has to remember to go check.
 
 ### Who would use this tool and how?
-<!-- Describe a realistic user and a typical workflow scenario. -->
+A small dev team or solo developer running local services or Docker containers who wants at-a-glance visibility into system health without manually checking in. A typical workflow: the pipeline runs automatically on a schedule, collects metrics, and updates a dashboard the developer can glance at each morning (or whenever) to see disk usage, CPU load, and container status — with a clear alert log if anything crossed a threshold overnight.
 
 ### Why is automation the right solution here?
-<!-- Explain why a script/pipeline beats a manual process or a GUI tool. -->
+A manual process is inconsistent, people forget to check, and it has no history: you only know the current state, not the trend over time. It also doesn't scale past one person checking one machine by hand. A scheduled pipeline runs the same checks every time, keeps a timestamped record so you can spot trends, and can alert automatically the moment a threshold is crossed — none of which a one-off manual check or a bare GUI tool gives you without someone actively driving it.
 
 ---
 
@@ -30,37 +30,39 @@
 
 ### Core Components
 
-<!-- List each component, its technology, and its responsibility.
-     You must use at least 3 technology domains. -->
-
 | Component | Technology | Responsibility |
 | --- | --- | --- |
-| e.g. `monitor.sh` | Bash | Watches directory, triggers pipeline |
-| e.g. `analyzer.py` | Python | Parses logs, generates JSON report |
-| e.g. `Dockerfile` | Docker | Containerizes the Python analyzer |
-| e.g. `ci.yml` | GitHub Actions | Runs pipeline on push, uploads artifact |
+| `collect_metrics.sh` | Bash | Collects disk usage, CPU load, running processes, log file sizes, and Docker container status |
+| `aggregator.py` | Python | Parses Bash output, normalizes into structured JSON, checks values against thresholds |
+| `Dockerfile` / `docker-compose.yml` | Docker | Containerizes a lightweight Python HTTP server that renders the JSON as an HTML dashboard |
+| `health-check.yml` | GitHub Actions | Cron-scheduled workflow that runs the collection pipeline and commits the updated JSON |
+| `alerts.log` handling | Logging/Security | Timestamped alert log when thresholds are exceeded, with rotation/retention policy |
 
 ### Technology Domains Used
 
-<!-- Check all that apply. You must check at least 3. -->
-
-- [ ] Bash scripting (file operations, error handling, functions)
-- [ ] Python scripting (data processing, pytest, argparse)
-- [ ] Docker / container orchestration
-- [ ] CI/CD pipelines / GitHub Actions
-- [ ] Logging, archiving, and security best practices
+- [x] Bash scripting (file operations, error handling, functions)
+- [x] Python scripting (data processing, pytest, argparse)
+- [x] Docker / container orchestration
+- [x] CI/CD pipelines / GitHub Actions
+- [x] Logging, archiving, and security best practices
 
 ### Data Flow Diagram
 
-<!-- ASCII diagram or written description showing how data moves through your system. -->
+[collect_metrics.sh] --> [raw metric output] --> [aggregator.py] --> [health.json]
+                                                          |
+                                                          +--> [alerts.log, if threshold exceeded]
 
-```text
-[input source] --> [component A] --> [component B] --> [output artifact]
-```
+[health.json] --> [Docker: Python HTTP server] --> [HTML dashboard]
+
+[GitHub Actions cron] --> triggers [collect_metrics.sh] on schedule --> commits updated [health.json]
 
 ### External Dependencies
 
-<!-- List pip packages, Docker base images, GitHub APIs, or third-party services you plan to use. -->
+- Python standard library `http.server` (or Flask, if we want routing) for serving the dashboard
+- `psutil` (optional) for cleaner CPU/process metrics in Python, or native Bash tools (`df`, `top`, `ps`) if we keep collection Bash-only
+- Docker base image: `python:3.12-slim`
+- GitHub Actions (`schedule` cron trigger)
+- `pytest` for the aggregator's test suite
 
 ---
 
