@@ -70,60 +70,53 @@ A manual process is inconsistent, people forget to check, and it has no history:
 
 ### Core Features (Must Have)
 
-<!-- 3-5 concrete, testable deliverables that define a passing project. -->
 
-1.
-2.
-3.
+1. We would need a collector to collect system metrics. A collector script that uses bash would work best. This collector will record things like the size of our file logs or disk usage.
+2. An aggregator would check if the things we are recording / tracking are over the limit. We would use python for this script!
+3. For an infra dashboard, we would need to create a simple UI and use some sort of server for it. Docker would be a great choice. Perhaps the dashboard can be created using HTML.
+4. Github action workflow(s) would be great to use here. We could use it to test or shellcheck when we push out the script. We can also have a workflow where the data recording happens on a schedule so that we can see if something is over the limit without a push.
 
 ### Stretch Features (Nice to Have)
 
-<!-- What would you add with extra time? Not required for a passing grade. -->
-
-1.
-2.
+1. A logging module working with the aggregator would be nice for error checking or testing. It is also nice just to see if our thresholds are working.
+2. We could add basic authentication to the server dashboard if we would like.
 
 ### Scope Justification
 
-<!-- Why is this scope achievable in a roughly 10-day window? Reference the time available and comparable past projects. -->
+This scope works well for the 10 day window. We have practiced the core pieces before so it should not take too long to implement into this project. The Bash collector will be building on the loops and log parsing code that we have done in Module 2. The Python aggregator we have also practiced in module 3, and the docker part was practiced in project 4. The Github actions workflow code is being done right now in project 5, which we can practice side by side with this project. With the knowledge and experience we should be able to finish on time.
 
 ### Known Risks and Mitigations
 
 | Risk | Likelihood | Mitigation |
 | --- | --- | --- |
-| e.g. GitHub API rate limiting | Medium | Cache responses, use authenticated requests |
-| [add a project risk] | [Low/Medium/High] | [how you will reduce or handle it] |
-
----
+| The cron worflow job could collide with someone's feature branch if it commits at a bad time | Medium | We're keeping the cron commits limited to the metrics file on main only, so feature branches don't touch it |
+| Docker might act differently depending on what OS it's running on | Medium | We'll just test on Ubuntu and have it skip Docker metrics gracefully if the daemon isn't there |
+| With three of us working at once, we could end up duplicating work or blocking each other | Low | Everyone owns their own piece from the start, and we'll check in at each milestone |
+| Our threshold numbers (like the 85% disk check) are kind of just guesses right now | Low | We'll test them against real sample data before finalizing them in |
+| We might get tempted to build something fancier than what's actually been taught and get stuck | Low | All four core features are based on stuff we've already done in Projects 3–5, so this one should be pretty low risk 
 
 ## Section 4: Git and Collaboration Plan
 
 ### Repository
 
-- Repository URL: *(this repository's URL — update once you have it)*
+- Repository URL: https://github.com/cs3030-valle-su26/cs3030-project7-shell-we-dance
 
 ### Planned Feature Branches
 
-<!-- At least 4 branches. For teams, assign an owner to each. -->
-
 | Branch Name | Owner | Description |
 | --- | --- | --- |
-| `feature/` | | |
-| `feature/` | | |
-| `feature/` | | |
-| `feature/` | | |
+| feature/metric-collectors | Eric Zavala Moguel | Bash scripts to collect disk, CPU, process, and Docker status metrics |
+| feature/aggregator | Jayanti Acharya | Python aggregator that parses metrics into JSON and checks thresholds |
+| feature/dashboard-docker | Omar Bustos | Dockerfile/compose setup and HTTP server rendering the HTML dashboard |
+| feature/ci-cron-workflow | Eric Zavala Moguel | GitHub Actions cron workflow to run the pipeline on a schedule |
 
 ### Commit Conventions
 
-We will follow conventional commit format: `feat:` `fix:` `docs:` `test:` `chore:` `refactor:`
-
-Example: `feat(parser): add JSON log detection`
+We will follow conventional commit format: feat: fix: docs: test: chore: refactor:
 
 ### Work Division (Teams Only)
 
-<!-- How will you split the work? Pair programming, divide by component, rotating roles? -->
-
----
+The work will be divided by parts. The parts are seperated as so: Eric will handle the the Bash Collecter script, as well as the Github Actions workflow. Jayanti will be building the Python aggregator and Omar will be working on the Docker Container and the dashboard. Everyone will have their own branch will need to open a pull request before merging into main. That way the other two members can review it. We will also check in with each other at each milestone to makesure everything is still connecting the way it should.
 
 ## Section 5: Timeline and Milestones
 
