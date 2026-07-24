@@ -1,7 +1,7 @@
 # Final Capstone Proposal
 
 **CS 3030 - Scripting Languages**
-**Team Members:** Jayanti Acharya (W01469558) | Omar Bustos (A#######) | Eric Zavala Moguel (A#######)
+**Team Members:** Jayanti Acharya (W01469558) | Omar Bustos (W01477301) | Eric Zavala Moguel (W01518822)
 **Date:** 2026-07-23
 
 > **Instructions:** Fill in every section below. Delete all instruction
