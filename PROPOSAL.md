@@ -1,5 +1,3 @@
-# Final Capstone Proposal
-
 **CS 3030 - Scripting Languages**
 **Team Members:** Jayanti Acharya (W01469558) | Omar Bustos (W01477301) | Eric Zavala Moguel (W01518822)
 **Date:** 2026-07-23
@@ -122,12 +120,16 @@ The work will be divided by parts. The parts are seperated as so: Eric will hand
 
 | Date | Milestone | Responsible |
 | --- | --- | --- |
-| [Day 1] | Proposal approved and implementation begins |
-| [Day 3] | Core Bash/Python components functional | [Jayanti and Eric] |
-| [Day 5] | Docker and/or CI/CD components functional | [Omar] |
-| [Day 7] | All core features complete, tests passing | [Everyone] |
-| [Day 9] | Documentation complete and video recorded | [Everyone] |
-| [Day 10] | Canvas submission completed | [Everyone] |
+| Day 1 | Proposal approved, repository pulled by all members, and implementation begins | All |
+| Day 2 | Project folder structure finalized and feature branches confirmed | All |
+| Day 3 | Bash metric collector functional for disk usage, CPU load, process count, log file size, and Docker status | Eric Zavala Moguel |
+| Day 4 | Python aggregator reads raw metric output and generates structured JSON | Jayanti Acharya |
+| Day 5 | Threshold detection and alert logging completed | Jayanti Acharya |
+| Day 6 | Dockerfile, Docker Compose setup, and basic dashboard server completed | Omar Bustos |
+| Day 7 | HTML dashboard displays health data from `health.json` | Omar Bustos |
+| Day 8 | GitHub Actions workflow runs tests, shellcheck, linting, and Docker validation | Eric Zavala Moguel |
+| Day 9 | End-to-end testing complete, documentation updated, and video demo recorded | All |
+| Day 10 | Final review completed, PR merged, and Canvas submission completed | All |
 
 ---
 
@@ -135,15 +137,136 @@ The work will be divided by parts. The parts are seperated as so: Eric will hand
 
 ### How will you verify your tool works?
 
-- **Unit tests (pytest):** [which functions/modules will you test?]
-- **Integration tests:** [what end-to-end scenario will you run?]
-- **Manual testing:** [what edge cases will you try by hand?]
+We will verify the Infrastructure Health Dashboard using unit tests, integration tests, manual testing, Docker validation, and GitHub Actions workflow checks. The goal is to confirm that each major component works individually and that the full pipeline works from metric collection to dashboard output.
+
+### Unit tests with pytest
+
+We will use `pytest` to test the Python aggregator. The tests will verify that the aggregator can correctly parse metric data, detect threshold violations, generate JSON output, and handle missing or invalid input.
+
+The pytest suite will test:
+
+- Disk usage parsing
+- CPU/load metric parsing
+- Process count parsing
+- Docker status parsing
+- Log file size parsing
+- Threshold detection logic
+- Alert message generation
+- JSON report structure
+- Missing or unavailable metric values
+- Invalid input handling
+
+Expected command:
+
+```bash
+pytest src/ --cov=src --cov-report=term-missing
+```
+
+### Integration tests
+
+For integration testing, we will run the complete workflow from start to finish. The Bash collector will collect system metrics and write raw output. The Python aggregator will process that output and create `health.json` and `alerts.log`. The dashboard server will then read the JSON file and display the results in the browser.
+
+End-to-end test scenario:
+
+1. Run the Bash metric collector.
+2. Confirm raw metrics are created.
+3. Run the Python aggregator.
+4. Confirm `health.json` is created.
+5. Confirm `alerts.log` is created when thresholds are exceeded.
+6. Start the dashboard server.
+7. Open the dashboard in a browser.
+8. Confirm the dashboard displays current health data.
+
+Expected commands:
+
+```bash
+bash collect_metrics.sh
+python3 aggregator.py --input raw_metrics.json --output health.json
+python3 dashboard.py --port 8000
+```
+
+### Manual testing
+
+We will manually test common edge cases to make sure the tool handles errors gracefully instead of crashing.
+
+Manual test cases:
+
+- Normal healthy environment
+- Disk usage over the threshold
+- Docker running normally
+- Docker not installed or not running
+- Empty metrics file
+- Invalid JSON input
+- Missing output file
+- Large log file warning
+- Dashboard loading successfully in a browser
+- Docker Compose startup and shutdown
+
+### Docker testing
+
+We will verify that the project can run inside a container. This confirms that the dashboard has a consistent runtime environment and can be started without relying only on one developer’s local setup.
+
+Expected commands:
+
+```bash
+docker build -t infrastructure-health-dashboard .
+docker compose config
+docker compose up
+```
+
+### CI/CD testing
+
+The GitHub Actions workflow will run on pushes and pull requests. At minimum, the workflow will include two jobs.
+
+The first job will validate Python code:
+
+- Install dependencies
+- Run pytest
+- Run pylint
+- Run black formatting check
+
+The second job will validate Bash and Docker:
+
+- Run Bash syntax check
+- Run shellcheck
+- Build the Docker image
+- Validate Docker Compose configuration
+- Run a basic smoke test
+
+Expected commands:
+
+```bash
+bash -n collect_metrics.sh
+shellcheck *.sh
+pytest src/ --cov=src --cov-report=term-missing
+pylint *.py
+black --check .
+docker build -t infrastructure-health-dashboard .
+docker compose config
+```
 
 ### Definition of Done
 
-<!-- Measurable and specific — how will you know when core features are complete? -->
-
 Our project is complete when:
+
+- The proposal is approved by the instructor.
+- The Bash metric collector runs successfully.
+- The Python aggregator generates structured JSON health data.
+- Threshold violations are detected correctly.
+- Alerts are written to `alerts.log`.
+- The HTML dashboard displays the latest health status.
+- Docker image builds successfully.
+- Docker Compose starts the dashboard successfully.
+- GitHub Actions has at least two passing jobs on `main`.
+- Pytest tests pass.
+- Bash and Python lint checks pass or are documented.
+- README is complete with setup, usage, architecture, testing instructions, known limitations, and reflection.
+- The team has at least 5 feature branches.
+- The team has at least 3 merged pull requests.
+- The team has at least 15 conventional commits.
+- At least one merge conflict is resolved and documented.
+- The final video demo is recorded with all team members participating.
+- The GitHub repository link and video link are submitted on Canvas.
 
 ---
 
