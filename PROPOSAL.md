@@ -74,7 +74,7 @@ A manual process is inconsistent, people forget to check, and it has no history:
 1. We would need a collector to collect system metrics. A collector script that uses bash would work best. This collector will record things like the size of our file logs or disk usage.
 2. An aggregator would check if the things we are recording / tracking are over the limit. We would use python for this script!
 3. For an infra dashboard, we would need to create a simple UI and use some sort of server for it. Docker would be a great choice. Perhaps the dashboard can be created using HTML.
-4. Github action workflow(s) would be great to use here. We could use it to test or shellcheck when we push out the script. We can also have a workflow where the data recording happens on a schedule so that we can see if something is over the limit without a push.
+4. Github action workflow(s) would be great to use here. We could use it to test or shellcheck when we push out the script. We can also have a workflow where the data recording (such as the disk usage, CPU load, log file size, etc) happens on a schedule so that we can see if something is over the limit without a push.
 
 ### Stretch Features (Nice to Have)
 
@@ -120,17 +120,14 @@ The work will be divided by parts. The parts are seperated as so: Eric will hand
 
 ## Section 5: Timeline and Milestones
 
-<!-- Use relative day markers across a roughly 10-day project span after approval.
-     Replace the sample milestones below with your own plan. -->
-
 | Date | Milestone | Responsible |
 | --- | --- | --- |
-| [Day 1] | Proposal approved and implementation begins | Both |
-| [Day 3] | Core Bash/Python components functional | [name] |
-| [Day 5] | Docker and/or CI/CD components functional | [name] |
-| [Day 7] | All core features complete, tests passing | Both |
-| [Day 9] | Documentation complete and video recorded | Both |
-| [Day 10] | Canvas submission completed | Both |
+| [Day 1] | Proposal approved and implementation begins |
+| [Day 3] | Core Bash/Python components functional | [Jayanti and Eric] |
+| [Day 5] | Docker and/or CI/CD components functional | [Omar] |
+| [Day 7] | All core features complete, tests passing | [Everyone] |
+| [Day 9] | Documentation complete and video recorded | [Everyone] |
+| [Day 10] | Canvas submission completed | [Everyone] |
 
 ---
 
