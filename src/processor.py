@@ -16,7 +16,6 @@ Author: Jayanti Acharya
 Date: 2026-07-27
 """
 
-
 import argparse
 import json
 import logging
@@ -43,6 +42,7 @@ logger = logging.getLogger(__name__)
 # Custom exceptions
 # ------------------------------------------------------------------------------
 
+
 class ProcessorError(Exception):
     """Base exception for all processor errors."""
 
@@ -68,6 +68,7 @@ THRESHOLDS = {
 # ------------------------------------------------------------------------------
 # Core processing class
 # ------------------------------------------------------------------------------
+
 
 class Processor:
     """
@@ -124,7 +125,9 @@ class Processor:
             "metrics": {},
             "alerts": [],
         }
-        logger.info("Processor initialized: input=%s format=%s", input_path, output_format)
+        logger.info(
+            "Processor initialized: input=%s format=%s", input_path, output_format
+        )
 
     def load_input(self) -> dict[str, Any]:
         """
@@ -253,6 +256,7 @@ class Processor:
         TODO: Adapt the columns and rows to match your results structure.
         """
         import csv  # local import — only needed for this format
+
         with self.output_path.open("w", newline="", encoding="utf-8") as fh:
             writer = csv.writer(fh)
             writer.writerow(["field", "value"])
@@ -290,6 +294,7 @@ class Processor:
 # CLI
 # ------------------------------------------------------------------------------
 
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """
     Parse command-line arguments.
@@ -301,10 +306,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         Parsed argument namespace.
     """
     parser = argparse.ArgumentParser(
-        description=(
-            # TODO: Replace with a one-line description of your tool.
-            "Process input data and generate a structured report."
-        ),
+        description="Aggregate raw system metrics into a health report with threshold alerts.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -315,19 +317,22 @@ Examples:
     )
 
     parser.add_argument(
-        "--input", "-i",
+        "--input",
+        "-i",
         required=True,
         type=Path,
         help="Path to the input file or directory to process.",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         required=True,
         type=Path,
         help="Path where the output report will be written.",
     )
     parser.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=Processor.SUPPORTED_FORMATS,
         default="json",
         dest="output_format",
