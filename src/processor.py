@@ -3,21 +3,19 @@
 processor.py - Python processing component
 CS 3030 - Project 7: Final Capstone
 
-TODO: Replace this module docstring with a description of what YOUR processor
-does, what inputs it accepts, and what outputs it produces.
-
-Example features to implement (replace with your own):
-    - Parse or transform input data from a file or stdin
-    - Apply analysis, detection, or aggregation logic
-    - Write structured output (JSON, CSV, HTML) to a file or stdout
-    - Log all operations using the logging module
+Reads raw metrics (key=value pairs) collected by orchestrator.sh, parses
+them into structured data, checks each metric against a defined threshold,
+and writes the results to health.json — including a list of any threshold
+breaches ("alerts"). This output is what the dashboard (src/dashboard_server.py)
+reads and displays.
 
 Usage:
-    python3 processor.py --input <path> --output <path> [--format json|csv|text]
+    python3 processor.py --input raw_metrics.txt --output health.json
 
-Author: Your Name
-Date: YYYY-MM-DD
+Author: Jayanti Acharya
+Date: 2026-07-27
 """
+
 
 import argparse
 import json
@@ -58,19 +56,30 @@ class OutputError(ProcessorError):
 
 
 # ------------------------------------------------------------------------------
+# Thresholds — tune these against real sample data
+# ------------------------------------------------------------------------------
+THRESHOLDS = {
+    "disk_usage_percent": 85,
+    "cpu_load_1min": 4.0,
+    "log_size_kb": 500_000,
+}
+
+
+# ------------------------------------------------------------------------------
 # Core processing class
-# TODO: Rename this class and update its docstring to match your project.
 # ------------------------------------------------------------------------------
 
 class Processor:
     """
-    Main processing class.
+    Aggregates raw system metrics into a health report.
 
-    TODO: Replace this docstring with a description of what your processor does.
+    Parses key=value metric lines produced by orchestrator.sh, checks each
+    metric against a threshold, and writes the results — including any
+    threshold breaches — to a structured JSON output.
 
     Attributes:
-        input_path (Path): Path to the input file or directory.
-        output_path (Path): Path where output will be written.
+        input_path (Path): Path to the raw metrics file.
+        output_path (Path): Path where health.json will be written.
         output_format (str): Output format — 'json', 'csv', or 'text'.
         results (dict[str, Any]): Accumulated results from processing.
     """
@@ -112,59 +121,94 @@ class Processor:
             "input": str(input_path),
             "items_processed": 0,
             "errors": [],
-            # TODO: Add fields specific to your project's output.
+            "metrics": {},
+            "alerts": [],
         }
         logger.info("Processor initialized: input=%s format=%s", input_path, output_format)
 
-    def load_input(self) -> Any:
+    def load_input(self) -> dict[str, Any]:
         """
-        Read and return the raw input data.
+        Read raw_metrics.txt and parse it into a dict of metric name -> value.
 
-        TODO: Replace this stub with logic that reads YOUR input format.
-              Examples: read a log file line by line, parse a JSON file,
-              list files in a directory, call an external API.
+        Each line is expected in key=value format. Values are converted to
+        bool, int, or float where possible; malformed lines are skipped with
+        a warning rather than crashing the whole run.
 
         Returns:
-            The raw input data in whatever form is useful for process().
+            A dict of parsed metrics, e.g. {"disk_usage_percent": 42}.
 
         Raises:
-            InputError: If the file cannot be read or parsed.
+            InputError: If the file cannot be read.
         """
         logger.info("Loading input from: %s", self.input_path)
 
-        # TODO: Replace with your actual input reading logic.
         try:
-            # Example: read a plain text file line by line
             lines = self.input_path.read_text(encoding="utf-8").splitlines()
-            logger.info("Loaded %d lines from input.", len(lines))
-            return lines
         except OSError as exc:
             raise InputError(f"Cannot read input file: {exc}") from exc
 
-    def process(self, data: Any) -> None:
-        """
-        Apply core logic to the loaded input data and populate self.results.
+        metrics: dict[str, Any] = {}
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            if "=" not in line:
+                logger.warning("Skipping malformed line: %s", line)
+                continue
 
-        TODO: This is where your main logic lives. Replace the example with
-              your own implementation — parsing, analysis, detection, etc.
+            key, value = line.split("=", 1)
+            metrics[key] = self._convert_value(value)
+
+        logger.info("Loaded %d metrics from input.", len(metrics))
+        return metrics
+
+    def _convert_value(self, raw: str) -> Any:
+        """Convert a raw string value to bool, int, float, or leave as str."""
+        if raw.lower() == "true":
+            return True
+        if raw.lower() == "false":
+            return False
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+        try:
+            return float(raw)
+        except ValueError:
+            pass
+        return raw
+
+    def process(self, data: dict[str, Any]) -> None:
+        """
+        Check each metric against THRESHOLDS and record any breaches.
+
+        Populates self.results["metrics"] with the parsed data, and
+        self.results["alerts"] with a human-readable message for each
+        metric that exceeds its threshold.
 
         Args:
-            data: The raw input returned by load_input().
+            data: The parsed metrics dict returned by load_input().
         """
-        logger.info("Processing %s items...", len(data) if hasattr(data, "__len__") else "?")
+        logger.info("Processing %d metrics...", len(data))
 
-        # TODO: Replace this example loop with your actual processing logic.
-        for item in data:
-            # Example: count non-empty lines
-            if item.strip():
-                self.results["items_processed"] += 1
+        self.results["metrics"] = data
+        self.results["items_processed"] = len(data)
 
-            # TODO: Add your analysis here. For example:
-            #   - Parse a log line and extract fields
-            #   - Check a condition and flag an anomaly
-            #   - Aggregate statistics
+        for key, threshold in THRESHOLDS.items():
+            if key not in data:
+                continue  # metric wasn't collected this run, skip it
 
-        logger.info("Processing complete. Items processed: %d", self.results["items_processed"])
+            value = data[key]
+            if isinstance(value, (int, float)) and value > threshold:
+                alert = f"{key} ({value}) exceeded threshold ({threshold})"
+                self.results["alerts"].append(alert)
+                logger.warning(alert)
+
+        logger.info(
+            "Processing complete. %d metrics processed, %d alerts.",
+            self.results["items_processed"],
+            len(self.results["alerts"]),
+        )
 
     def write_output(self) -> None:
         """
