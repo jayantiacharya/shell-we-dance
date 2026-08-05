@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *"
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -106,6 +108,45 @@ jobs:
           name: coverage-report
           path: .coverage
           retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Job: Scheduled metrics collection (runs the pipeline, commits results)
+  # ---------------------------------------------------------------------------
+  collect:
+    name: Scheduled Metrics Collection
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run Bash collector
+        run: bash src/orchestrator.sh
+
+      - name: Run Python aggregator
+        run: python3 src/processor.py --input raw_metrics.json --output health.json
+
+      - name: Commit and push updated metrics
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add health.json raw_metrics.json
+          git diff --cached --quiet && echo "No changes to commit." || git commit -m "chore(data): update health.json and raw_metrics.json [skip ci]"
+          git push
 
   # ---------------------------------------------------------------------------
   # Job 3: Build / integration check (add your own steps here)
