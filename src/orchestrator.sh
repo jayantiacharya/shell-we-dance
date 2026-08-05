@@ -3,7 +3,9 @@
 # orchestrator.sh - Main Bash orchestration script
 # CS 3030 - Project 7: Final Capstone
 #
-# TODO: Replace this header with a description of what YOUR tool does.
+# Collects system health metrics — disk usage, CPU load, process count,
+# log directory size, and Docker container status — and writes them to
+# raw_metrics.json for the Python aggregator to process into health.json.
 #
 # Usage:
 #   ./orchestrator.sh [--config <file>] [--dry-run] [--verbose]
@@ -131,8 +133,13 @@ check_dependencies() {
 # Configuration
 # ------------------------------------------------------------------------------
 
-# load_config — validate that the config file exists and is readable
-# TODO: Expand this function to actually parse your config (YAML, JSON, or env vars)
+# Populated by load_config; used by collect_log_size
+LOG_DIRECTORY=""
+
+# load_config — validate the config file exists/readable, then parse the
+# values orchestrator.sh actually needs out of it
+# Args: $1 = path to config file
+# Returns: 0 on success, exits 2 on missing/unreadable/invalid config
 load_config() {
     local config_file="$1"
 
@@ -148,20 +155,23 @@ load_config() {
 
     log_info "Loaded configuration from: $config_file"
 
-    # TODO: Parse config values into variables. Example for a YAML key:
-    #   MY_SETTING=$(grep '^my_setting:' "$config_file" | awk '{print $2}')
+    LOG_DIRECTORY=$(grep '^log_directory:' "$config_file" | awk '{print $2}')
+
+    if [[ -z "$LOG_DIRECTORY" ]]; then
+        log_error "log_directory not set in $config_file"
+        exit 2
+    fi
+
+    log_debug "Parsed config — log_directory: ${LOG_DIRECTORY}"
 }
 
 # ------------------------------------------------------------------------------
 # Core logic — replace these stubs with your actual tool's functionality
 # ------------------------------------------------------------------------------
 
-# run_step_one — TODO: replace with your first major operation
+# collect_disk_usage — root filesystem usage as a percentage
 # Args: none
-# Returns: 0 on success, 1 on failure
-# collect_cpu_load — 1-minute system load average
-# Args: none
-# Returns: prints the 1-minute load average (e.g. "0.85")
+# Returns: prints the disk usage percentage (e.g. "42")
 collect_disk_usage() {
     local pct
     log_debug "Raw df output: $(df /)"
@@ -169,6 +179,9 @@ collect_disk_usage() {
     echo "$pct"
 }
 
+# collect_cpu_load — 1-minute system load average
+# Args: none
+# Returns: prints the 1-minute load average (e.g. "0.85")
 collect_cpu_load() {
     local load
     log_debug "Raw loadavg: $(cat /proc/loadavg)"
@@ -176,20 +189,29 @@ collect_cpu_load() {
     echo "$load"
 }
 
+# collect_process_count — total number of running processes
+# Args: none
+# Returns: prints the process count (e.g. "187")
 collect_process_count() {
     local count
     count=$(ps aux | wc -l)
     echo "$count"
 }
 
+# collect_log_size — size in MB of the configured log directory
+# Args: none — reads LOG_DIRECTORY (set by load_config)
+# Returns: prints the size in megabytes (e.g. "12"), or "0" if unavailable
 collect_log_size() {
-    local log_dir size
-    log_dir=$(grep '^log_directory:' "$CONFIG_FILE" | awk '{print $2}')
-    log_debug "Log directory from config: ${log_dir}"
-    size=$(du -sm "$log_dir" 2>/dev/null | awk '{print $1}') || size=0
+    local size
+    size=$(du -sm "$LOG_DIRECTORY" 2>/dev/null | awk '{print $1}') || size=0
     echo "${size:-0}"
 }
 
+
+# collect_docker_status — running/total container counts as JSON
+# Args: none
+# Returns: prints a small JSON object; degrades gracefully if Docker
+#          is absent OR present but unreachable (e.g. daemon not running)
 collect_docker_status() {
     local running total
     if ! docker info &>/dev/null; then
@@ -202,6 +224,10 @@ collect_docker_status() {
     echo "{\"available\": true, \"containers_running\": $running, \"containers_total\": $total}"
 }
 
+
+# write_raw_metrics — collect all metrics and write them to raw_metrics.json
+# Args: none
+# Returns: 0 on success
 write_raw_metrics() {
     local output_file="${SCRIPT_DIR}/../raw_metrics.json"
     local timestamp host disk cpu procs logsize docker_json
@@ -244,50 +270,6 @@ EOF
     log_success "Wrote raw metrics to ${output_file}"
 }
 
-
-run_step_one() {
-    log_info "Starting step one..."
-
-    # Implement your first major operation here.
-    #
-    # Tips:
-    #   - Use 'local' for all variables inside functions
-    #   - Return 1 (don't exit) on non-fatal errors so the caller can decide
-    #   - Write meaningful log messages at each stage
-    #
-    # Example pattern:
-    #   local input_dir="$1"
-    #   if [[ ! -d "$input_dir" ]]; then
-    #       log_error "Input directory does not exist: $input_dir"
-    #       return 1
-    #   fi
-
-    if [[ "$DRY_RUN" == true ]]; then
-        log_info "[DRY RUN] Would execute step one — skipping."
-        return 0
-    fi
-
-    # YOUR CODE HERE
-
-    log_success "Step one complete."
-}
-
-# run_step_two — TODO: replace with your second major operation
-# Args: none
-# Returns: 0 on success, 1 on failure
-run_step_two() {
-    log_info "Starting step two..."
-
-    if [[ "$DRY_RUN" == true ]]; then
-        log_info "[DRY RUN] Would execute step two — skipping."
-        return 0
-    fi
-
-    # YOUR CODE HERE
-
-    log_success "Step two complete."
-}
-
 # call_python — invoke the Python processor component
 # Args: $1 = path to Python script, remaining args passed through
 # Returns: Python script's exit code
@@ -303,7 +285,7 @@ call_python() {
 
     log_info "Calling Python processor: $python_script ${python_args[*]:-}"
 
-    # TODO: Adjust the python_script path and arguments to match your project.
+    # Adjust the python_script path and arguments to match your project.
     python3 "$python_script" "${python_args[@]}"
 }
 
@@ -315,7 +297,8 @@ usage() {
     cat <<EOF
 Usage: $SCRIPT_NAME [OPTIONS]
 
-TODO: Replace this description with what your tool actually does.
+Collects disk usage, CPU load, process count, log directory size, and
+Docker container status. Writes results to raw_metrics.json.
 
 Options:
   -c, --config <file>   Path to config file (default: $DEFAULT_CONFIG)
@@ -378,7 +361,7 @@ main() {
     write_raw_metrics
 
     # Uncomment and update once your Python processor is ready.
-    # call_python "${SCRIPT_DIR}/processor.py" --input "$INPUT_PATH"
+    # call_python "${SCRIPT_DIR}/processor.py" --input "${SCRIPT_DIR}/../raw_metrics.json" --output "${SCRIPT_DIR}/../health.json"
 
     log_success "=== ${SCRIPT_NAME} finished successfully ==="
 }
