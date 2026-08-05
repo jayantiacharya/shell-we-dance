@@ -159,10 +159,96 @@ load_config() {
 # run_step_one — TODO: replace with your first major operation
 # Args: none
 # Returns: 0 on success, 1 on failure
+# collect_cpu_load — 1-minute system load average
+# Args: none
+# Returns: prints the 1-minute load average (e.g. "0.85")
+collect_disk_usage() {
+    local pct
+    log_debug "Raw df output: $(df /)"
+    pct=$(df / | awk 'NR==2 {gsub("%","",$5); print $5}')
+    echo "$pct"
+}
+
+collect_cpu_load() {
+    local load
+    log_debug "Raw loadavg: $(cat /proc/loadavg)"
+    load=$(awk '{print $1}' /proc/loadavg)
+    echo "$load"
+}
+
+collect_process_count() {
+    local count
+    count=$(ps aux | wc -l)
+    echo "$count"
+}
+
+collect_log_size() {
+    local log_dir size
+    log_dir=$(grep '^log_directory:' "$CONFIG_FILE" | awk '{print $2}')
+    log_debug "Log directory from config: ${log_dir}"
+    size=$(du -sm "$log_dir" 2>/dev/null | awk '{print $1}') || size=0
+    echo "${size:-0}"
+}
+
+collect_docker_status() {
+    local running total
+    if ! docker info &>/dev/null; then
+        echo '{"available": false, "containers_running": 0, "containers_total": 0}'
+        return 0
+    fi
+    log_debug "Docker found and responding, querying container status"
+    running=$(docker ps -q | wc -l)
+    total=$(docker ps -aq | wc -l)
+    echo "{\"available\": true, \"containers_running\": $running, \"containers_total\": $total}"
+}
+
+write_raw_metrics() {
+    local output_file="${SCRIPT_DIR}/../raw_metrics.json"
+    local timestamp host disk cpu procs logsize docker_json
+
+    if [[ "$DRY_RUN" == true ]]; then
+        log_info "[DRY RUN] Would write metrics to ${output_file} — skipping."
+        return 0
+    fi
+
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    host=$(hostname)
+    disk=$(collect_disk_usage)
+    cpu=$(collect_cpu_load)
+    procs=$(collect_process_count)
+    logsize=$(collect_log_size)
+    docker_json=$(collect_docker_status)
+
+    log_info "Disk usage: ${disk}%"
+    log_info "CPU load (1min): ${cpu}"
+    log_info "Process count: ${procs}"
+    log_info "Log directory size: ${logsize}MB"
+    if [[ "$docker_json" == *'"available": false'* ]]; then
+        log_warn "Docker not available — skipping container metrics."
+    else
+        log_info "Docker containers detected and running"
+    fi
+
+    cat > "$output_file" <<EOF
+{
+  "timestamp": "$timestamp",
+  "host": "$host",
+  "disk_usage_percent": $disk,
+  "cpu_load_1min": $cpu,
+  "process_count": $procs,
+  "log_size_mb": $logsize,
+  "docker": $docker_json
+}
+EOF
+
+    log_success "Wrote raw metrics to ${output_file}"
+}
+
+
 run_step_one() {
     log_info "Starting step one..."
 
-    # TODO: Implement your first major operation here.
+    # Implement your first major operation here.
     #
     # Tips:
     #   - Use 'local' for all variables inside functions
@@ -283,16 +369,15 @@ main() {
     log_info "=== ${SCRIPT_NAME} starting ==="
     [[ "$DRY_RUN" == true ]] && log_warn "Dry-run mode enabled — no changes will be made."
 
-    # TODO: Update this list with the tools your script actually needs.
+    # Update this list with the tools your script actually needs.
     check_dependencies python3
 
     load_config "$CONFIG_FILE"
 
-    # TODO: Call your functions in the correct order.
-    run_step_one
-    run_step_two
+    # Call your functions in the correct order.
+    write_raw_metrics
 
-    # TODO: Uncomment and update once your Python processor is ready.
+    # Uncomment and update once your Python processor is ready.
     # call_python "${SCRIPT_DIR}/processor.py" --input "$INPUT_PATH"
 
     log_success "=== ${SCRIPT_NAME} finished successfully ==="
