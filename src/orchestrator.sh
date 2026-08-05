@@ -33,8 +33,6 @@ readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'
 
-# shellcheck disable=SC2034  # reserved for future use
-VERBOSE=false
 readonly BLUE='\033[0;34m'
 readonly NC='\033[0m'
 
@@ -89,6 +87,18 @@ log_success() {
     timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     echo "${timestamp} [INFO]  ${SCRIPT_NAME}: ${message}" | tee -a "$LOG_FILE"
     echo -e "${GREEN}✓ ${message}${NC}"
+}
+
+# log_debug "message"  — only prints when --verbose is set (blue on console)
+log_debug() {
+    local message="$1"
+    local timestamp
+
+    if [[ "$VERBOSE" == true ]]; then
+        timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        echo "${timestamp} [DEBUG] ${SCRIPT_NAME}: ${message}" | tee -a "$LOG_FILE"
+        echo -e "${BLUE}DEBUG: ${message}${NC}" >&2
+    fi
 }
 
 # ------------------------------------------------------------------------------
