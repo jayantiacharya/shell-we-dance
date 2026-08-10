@@ -133,8 +133,9 @@ check_dependencies() {
 # Configuration
 # ------------------------------------------------------------------------------
 
-# Populated by load_config; used by collect_log_size
+# Populated by load_config; used by collect_log_size and write_raw_metrics
 LOG_DIRECTORY=""
+RAW_METRICS_PATH=""
 
 # load_config — validate the config file exists/readable, then parse the
 # values orchestrator.sh actually needs out of it
@@ -156,13 +157,19 @@ load_config() {
     log_info "Loaded configuration from: $config_file"
 
     LOG_DIRECTORY=$(grep '^log_directory:' "$config_file" | awk '{print $2}')
+    RAW_METRICS_PATH=$(grep '^raw_metrics_path:' "$config_file" | awk -F'"' '{print $2}')
 
     if [[ -z "$LOG_DIRECTORY" ]]; then
         log_error "log_directory not set in $config_file"
         exit 2
     fi
 
-    log_debug "Parsed config — log_directory: ${LOG_DIRECTORY}"
+    if [[ -z "$RAW_METRICS_PATH" ]]; then
+        log_warn "raw_metrics_path not set — defaulting to raw_metrics.txt"
+        RAW_METRICS_PATH="raw_metrics.txt"
+    fi
+
+    log_debug "Parsed config — log_directory: ${LOG_DIRECTORY}, raw_metrics_path: ${RAW_METRICS_PATH}"
 }
 
 # ------------------------------------------------------------------------------
@@ -198,73 +205,73 @@ collect_process_count() {
     echo "$count"
 }
 
-# collect_log_size — size in MB of the configured log directory
+# collect_log_size — size in KB of the configured log directory
 # Args: none — reads LOG_DIRECTORY (set by load_config)
-# Returns: prints the size in megabytes (e.g. "12"), or "0" if unavailable
+# Returns: prints the size in kilobytes (e.g. "1024"), or "0" if unavailable
 collect_log_size() {
     local size
-    size=$(du -sm "$LOG_DIRECTORY" 2>/dev/null | awk '{print $1}') || size=0
+    size=$(du -sk "$LOG_DIRECTORY" 2>/dev/null | awk '{print $1}') || size=0
     echo "${size:-0}"
 }
 
 
-# collect_docker_status — running/total container counts as JSON
+# collect_docker_available — whether Docker is installed and reachable
 # Args: none
-# Returns: prints a small JSON object; degrades gracefully if Docker
-#          is absent OR present but unreachable (e.g. daemon not running)
-collect_docker_status() {
-    local running total
+# Returns: prints "true" or "false"
+collect_docker_available() {
+    if docker info &>/dev/null; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+# collect_docker_container_count — number of currently running containers
+# Args: none
+# Returns: prints a count, or "0" if Docker is unavailable
+collect_docker_container_count() {
+    local count
     if ! docker info &>/dev/null; then
-        echo '{"available": false, "containers_running": 0, "containers_total": 0}'
+        echo "0"
         return 0
     fi
-    log_debug "Docker found and responding, querying container status"
-    running=$(docker ps -q | wc -l)
-    total=$(docker ps -aq | wc -l)
-    echo "{\"available\": true, \"containers_running\": $running, \"containers_total\": $total}"
+    count=$(docker ps -q | wc -l)
+    echo "$count"
 }
 
 
-# write_raw_metrics — collect all metrics and write them to raw_metrics.json
+# write_raw_metrics — collect all metrics and write them as key=value lines
 # Args: none
 # Returns: 0 on success
 write_raw_metrics() {
-    local output_file="${SCRIPT_DIR}/../raw_metrics.json"
-    local timestamp host disk cpu procs logsize docker_json
+    local output_file="${SCRIPT_DIR}/../${RAW_METRICS_PATH}"
+    local disk cpu procs logsize docker_avail docker_count
 
     if [[ "$DRY_RUN" == true ]]; then
         log_info "[DRY RUN] Would write metrics to ${output_file} — skipping."
         return 0
     fi
 
-    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    host=$(hostname)
     disk=$(collect_disk_usage)
     cpu=$(collect_cpu_load)
     procs=$(collect_process_count)
     logsize=$(collect_log_size)
-    docker_json=$(collect_docker_status)
+    docker_avail=$(collect_docker_available)
+    docker_count=$(collect_docker_container_count)
 
     log_info "Disk usage: ${disk}%"
     log_info "CPU load (1min): ${cpu}"
     log_info "Process count: ${procs}"
-    log_info "Log directory size: ${logsize}MB"
-    if [[ "$docker_json" == *'"available": false'* ]]; then
-        log_warn "Docker not available — skipping container metrics."
-    else
-        log_info "Docker containers detected and running"
-    fi
+    log_info "Log directory size: ${logsize}KB"
+    log_info "Docker available: ${docker_avail}, running containers: ${docker_count}"
 
     cat > "$output_file" <<EOF
-{
-  "timestamp": "$timestamp",
-  "host": "$host",
-  "disk_usage_percent": $disk,
-  "cpu_load_1min": $cpu,
-  "process_count": $procs,
-  "log_size_mb": $logsize,
-  "docker": $docker_json
-}
+disk_usage_percent=${disk}
+cpu_load_1min=${cpu}
+process_count=${procs}
+log_size_kb=${logsize}
+docker_available=${docker_avail}
+docker_container_count=${docker_count}
 EOF
 
     log_success "Wrote raw metrics to ${output_file}"

@@ -10,6 +10,9 @@ raw_metrics_path: "raw_metrics.txt"
 # Path where the Python aggregator writes its structured report
 health_report_path: "health.json"
 
+# Path to the log directory the collector should measure
+log_directory: /var/log
+
 # TODO: add threshold values here if you'd rather configure them
 # than hardcode them in processor.py, e.g.:
 # thresholds:
