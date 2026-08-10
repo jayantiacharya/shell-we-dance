@@ -144,7 +144,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add health.json raw_metrics.json
+          git add health.json
           git diff --cached --quiet && echo "No changes to commit." || git commit -m "chore(data): update health.json and raw_metrics.json [skip ci]"
           git push
 
