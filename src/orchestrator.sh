@@ -3,7 +3,9 @@
 # orchestrator.sh - Main Bash orchestration script
 # CS 3030 - Project 7: Final Capstone
 #
-# TODO: Replace this header with a description of what YOUR tool does.
+# Collects system health metrics — disk usage, CPU load, process count,
+# log directory size, and Docker container status — and writes them to
+# raw_metrics.json for the Python aggregator to process into health.json.
 #
 # Usage:
 #   ./orchestrator.sh [--config <file>] [--dry-run] [--verbose]
@@ -33,8 +35,6 @@ readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'
 
-# shellcheck disable=SC2034  # reserved for future use
-VERBOSE=false
 readonly BLUE='\033[0;34m'
 readonly NC='\033[0m'
 
@@ -91,6 +91,18 @@ log_success() {
     echo -e "${GREEN}✓ ${message}${NC}"
 }
 
+# log_debug "message"  — only prints when --verbose is set (blue on console)
+log_debug() {
+    local message="$1"
+    local timestamp
+
+    if [[ "$VERBOSE" == true ]]; then
+        timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        echo "${timestamp} [DEBUG] ${SCRIPT_NAME}: ${message}" | tee -a "$LOG_FILE"
+        echo -e "${BLUE}DEBUG: ${message}${NC}" >&2
+    fi
+}
+
 # ------------------------------------------------------------------------------
 # Dependency and environment checks
 # ------------------------------------------------------------------------------
@@ -121,8 +133,14 @@ check_dependencies() {
 # Configuration
 # ------------------------------------------------------------------------------
 
-# load_config — validate that the config file exists and is readable
-# TODO: Expand this function to actually parse your config (YAML, JSON, or env vars)
+# Populated by load_config; used by collect_log_size and write_raw_metrics
+LOG_DIRECTORY=""
+RAW_METRICS_PATH=""
+
+# load_config — validate the config file exists/readable, then parse the
+# values orchestrator.sh actually needs out of it
+# Args: $1 = path to config file
+# Returns: 0 on success, exits 2 on missing/unreadable/invalid config
 load_config() {
     local config_file="$1"
 
@@ -138,58 +156,125 @@ load_config() {
 
     log_info "Loaded configuration from: $config_file"
 
-    # TODO: Parse config values into variables. Example for a YAML key:
-    #   MY_SETTING=$(grep '^my_setting:' "$config_file" | awk '{print $2}')
+    LOG_DIRECTORY=$(grep '^log_directory:' "$config_file" | awk '{print $2}')
+    RAW_METRICS_PATH=$(grep '^raw_metrics_path:' "$config_file" | awk -F'"' '{print $2}')
+
+    if [[ -z "$LOG_DIRECTORY" ]]; then
+        log_error "log_directory not set in $config_file"
+        exit 2
+    fi
+
+    if [[ -z "$RAW_METRICS_PATH" ]]; then
+        log_warn "raw_metrics_path not set — defaulting to raw_metrics.txt"
+        RAW_METRICS_PATH="raw_metrics.txt"
+    fi
+
+    log_debug "Parsed config — log_directory: ${LOG_DIRECTORY}, raw_metrics_path: ${RAW_METRICS_PATH}"
 }
 
 # ------------------------------------------------------------------------------
 # Core logic — replace these stubs with your actual tool's functionality
 # ------------------------------------------------------------------------------
 
-# run_step_one — TODO: replace with your first major operation
+# collect_disk_usage — root filesystem usage as a percentage
 # Args: none
-# Returns: 0 on success, 1 on failure
-run_step_one() {
-    log_info "Starting step one..."
-
-    # TODO: Implement your first major operation here.
-    #
-    # Tips:
-    #   - Use 'local' for all variables inside functions
-    #   - Return 1 (don't exit) on non-fatal errors so the caller can decide
-    #   - Write meaningful log messages at each stage
-    #
-    # Example pattern:
-    #   local input_dir="$1"
-    #   if [[ ! -d "$input_dir" ]]; then
-    #       log_error "Input directory does not exist: $input_dir"
-    #       return 1
-    #   fi
-
-    if [[ "$DRY_RUN" == true ]]; then
-        log_info "[DRY RUN] Would execute step one — skipping."
-        return 0
-    fi
-
-    # YOUR CODE HERE
-
-    log_success "Step one complete."
+# Returns: prints the disk usage percentage (e.g. "42")
+collect_disk_usage() {
+    local pct
+    log_debug "Raw df output: $(df /)"
+    pct=$(df / | awk 'NR==2 {gsub("%","",$5); print $5}')
+    echo "$pct"
 }
 
-# run_step_two — TODO: replace with your second major operation
+# collect_cpu_load — 1-minute system load average
 # Args: none
-# Returns: 0 on success, 1 on failure
-run_step_two() {
-    log_info "Starting step two..."
+# Returns: prints the 1-minute load average (e.g. "0.85")
+collect_cpu_load() {
+    local load
+    log_debug "Raw loadavg: $(cat /proc/loadavg)"
+    load=$(awk '{print $1}' /proc/loadavg)
+    echo "$load"
+}
+
+# collect_process_count — total number of running processes
+# Args: none
+# Returns: prints the process count (e.g. "187")
+collect_process_count() {
+    local count
+    count=$(ps aux | wc -l)
+    echo "$count"
+}
+
+# collect_log_size — size in KB of the configured log directory
+# Args: none — reads LOG_DIRECTORY (set by load_config)
+# Returns: prints the size in kilobytes (e.g. "1024"), or "0" if unavailable
+collect_log_size() {
+    local size
+    size=$(du -sk "$LOG_DIRECTORY" 2>/dev/null | awk '{print $1}') || size=0
+    echo "${size:-0}"
+}
+
+
+# collect_docker_available — whether Docker is installed and reachable
+# Args: none
+# Returns: prints "true" or "false"
+collect_docker_available() {
+    if docker info &>/dev/null; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+# collect_docker_container_count — number of currently running containers
+# Args: none
+# Returns: prints a count, or "0" if Docker is unavailable
+collect_docker_container_count() {
+    local count
+    if ! docker info &>/dev/null; then
+        echo "0"
+        return 0
+    fi
+    count=$(docker ps -q | wc -l)
+    echo "$count"
+}
+
+
+# write_raw_metrics — collect all metrics and write them as key=value lines
+# Args: none
+# Returns: 0 on success
+write_raw_metrics() {
+    local output_file="${SCRIPT_DIR}/../${RAW_METRICS_PATH}"
+    local disk cpu procs logsize docker_avail docker_count
 
     if [[ "$DRY_RUN" == true ]]; then
-        log_info "[DRY RUN] Would execute step two — skipping."
+        log_info "[DRY RUN] Would write metrics to ${output_file} — skipping."
         return 0
     fi
 
-    # YOUR CODE HERE
+    disk=$(collect_disk_usage)
+    cpu=$(collect_cpu_load)
+    procs=$(collect_process_count)
+    logsize=$(collect_log_size)
+    docker_avail=$(collect_docker_available)
+    docker_count=$(collect_docker_container_count)
 
-    log_success "Step two complete."
+    log_info "Disk usage: ${disk}%"
+    log_info "CPU load (1min): ${cpu}"
+    log_info "Process count: ${procs}"
+    log_info "Log directory size: ${logsize}KB"
+    log_info "Docker available: ${docker_avail}, running containers: ${docker_count}"
+
+    cat > "$output_file" <<EOF
+disk_usage_percent=${disk}
+cpu_load_1min=${cpu}
+process_count=${procs}
+log_size_kb=${logsize}
+docker_available=${docker_avail}
+docker_container_count=${docker_count}
+EOF
+
+    log_success "Wrote raw metrics to ${output_file}"
 }
 
 # call_python — invoke the Python processor component
@@ -207,7 +292,7 @@ call_python() {
 
     log_info "Calling Python processor: $python_script ${python_args[*]:-}"
 
-    # TODO: Adjust the python_script path and arguments to match your project.
+    # Adjust the python_script path and arguments to match your project.
     python3 "$python_script" "${python_args[@]}"
 }
 
@@ -219,7 +304,8 @@ usage() {
     cat <<EOF
 Usage: $SCRIPT_NAME [OPTIONS]
 
-TODO: Replace this description with what your tool actually does.
+Collects disk usage, CPU load, process count, log directory size, and
+Docker container status. Writes results to raw_metrics.json.
 
 Options:
   -c, --config <file>   Path to config file (default: $DEFAULT_CONFIG)
@@ -273,17 +359,16 @@ main() {
     log_info "=== ${SCRIPT_NAME} starting ==="
     [[ "$DRY_RUN" == true ]] && log_warn "Dry-run mode enabled — no changes will be made."
 
-    # TODO: Update this list with the tools your script actually needs.
+    # Update this list with the tools your script actually needs.
     check_dependencies python3
 
     load_config "$CONFIG_FILE"
 
-    # TODO: Call your functions in the correct order.
-    run_step_one
-    run_step_two
+    # Call your functions in the correct order.
+    write_raw_metrics
 
-    # TODO: Uncomment and update once your Python processor is ready.
-    # call_python "${SCRIPT_DIR}/processor.py" --input "$INPUT_PATH"
+    # Uncomment and update once your Python processor is ready.
+    # call_python "${SCRIPT_DIR}/processor.py" --input "${SCRIPT_DIR}/../raw_metrics.json" --output "${SCRIPT_DIR}/../health.json"
 
     log_success "=== ${SCRIPT_NAME} finished successfully ==="
 }
