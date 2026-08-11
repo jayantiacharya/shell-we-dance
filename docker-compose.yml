@@ -1,0 +1,10 @@
+# docker-compose.yml - Runs the dashboard container
+# CS 3030 - Project 7: Final Capstone
+# Owner: Omar
+
+version: "3.9"
+
+services:
+  dashboard:
+    build: .
+    # TODO: port mapping, volume mount for health.json
