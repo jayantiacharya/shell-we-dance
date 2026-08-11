@@ -118,7 +118,7 @@ class Processor:
         self.output_path = output_path
         self.output_format = output_format
         self.results: dict[str, Any] = {
-            "processed_at": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "input": str(input_path),
             "items_processed": 0,
             "errors": [],
