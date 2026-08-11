@@ -1,0 +1,6 @@
+disk_usage_percent=92
+cpu_load_1min=0.35
+process_count=187
+log_size_kb=1024
+docker_available=true
+docker_container_count=3
