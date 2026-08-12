@@ -92,13 +92,13 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run pytest with coverage
-        # Minimum required coverage is 70%. Add tests to src/ before submission.
+        # Minimum required coverage is 70%. Tests are stored in tests/ and must maintain at least 70% coverage.
         run: |
-          if find src/ -name "test_*.py" -o -name "*_test.py" 2>/dev/null | grep -q .; then
-            pytest src/ --cov=src --cov-report=term-missing --cov-fail-under=70 -v
+          if find tests/ \( -name "test_*.py" -o -name "*_test.py" \) -print -quit 2>/dev/null | grep -q .; then
+            pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=70 -v
           else
-            echo "Warning: no test files found in src/ — add tests before submission."
-            exit 0
+            echo "Error: no pytest test files found in tests/."
+            exit 1
           fi
 
       - name: Upload coverage report
@@ -138,38 +138,91 @@ jobs:
         run: bash src/orchestrator.sh
 
       - name: Run Python aggregator
-        run: python3 src/processor.py --input raw_metrics.json --output health.json
+        run: python3 src/processor.py --input raw_metrics.txt --output health.json
 
       - name: Commit and push updated metrics
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add health.json
-          git diff --cached --quiet && echo "No changes to commit." || git commit -m "chore(data): update health.json and raw_metrics.json [skip ci]"
+          git diff --cached --quiet && echo "No changes to commit." || git commit -m "chore(data): update health.json and raw_metrics.txt [skip ci]"
           git push
 
+    # ---------------------------------------------------------------------------
+  # Job 3: Docker build and end-to-end integration validation
   # ---------------------------------------------------------------------------
-  # Job 3: Build / integration check (add your own steps here)
-  # ---------------------------------------------------------------------------
-  # TODO: Add a third job specific to your project. Examples:
-  #
-  #   - Build and test your Docker image:
-  #       docker build -t my-tool .
-  #       docker run --rm my-tool --help
-  #
-  #   - Run an end-to-end integration scenario:
-  #       bash src/monitor.sh --dry-run
-  #       python src/analyzer.py --input sample_data/test.log
-  #
-  # Uncomment and adapt the template below:
-  #
-  # build:
-  #   name: Build & Integration
-  #   runs-on: ubuntu-latest
-  #   needs: test
-  #
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #
-  #     - name: TODO - add your build/integration steps here
-  #       run: echo "Replace this with your actual build or integration commands"
+  build:
+    name: Build & Integration
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      # Generate real monitoring data before starting the dashboard.
+      # This validates the same Bash -> Python -> Docker workflow used locally.
+      - name: Generate infrastructure health report
+        run: |
+          bash src/orchestrator.sh
+          python3 src/processor.py \
+            --input raw_metrics.txt \
+            --output health.json
+
+      # Build and launch the dashboard using the submitted Docker Compose file.
+      - name: Build and start dashboard
+        run: docker compose up --build -d
+
+      # Wait for the Dockerfile HEALTHCHECK to report a healthy container.
+      - name: Wait for dashboard health check
+        run: |
+          for attempt in {1..12}; do
+            status=$(docker inspect \
+              --format='{{.State.Health.Status}}' \
+              infrastructure-health-dashboard)
+
+            echo "Health check attempt ${attempt}: ${status}"
+
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          echo "Dashboard did not become healthy within 60 seconds."
+          docker compose logs
+          exit 1
+
+      # Exercise both public routes through the running Docker container.
+      - name: Test dashboard endpoints
+        run: |
+          curl --fail --show-error http://127.0.0.1:8000/ > /tmp/dashboard.html
+          curl --fail --show-error http://127.0.0.1:8000/health.json > /tmp/health.json
+
+          grep -q "Infrastructure Health Dashboard" /tmp/dashboard.html
+          grep -q '"metrics"' /tmp/health.json
+
+      # Always display the container state to make CI failures easier to diagnose.
+      - name: Show Docker status and logs
+        if: always()
+        run: |
+          docker compose ps
+          docker compose logs --tail=100
+
+      # Always remove containers and the custom network after the CI run.
+      - name: Shut down dashboard
+        if: always()
+        run: docker compose down

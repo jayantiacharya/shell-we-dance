@@ -72,3 +72,6 @@ temp/
 *.bak
 *.orig
 test_output.json
+
+# Generated collector data
+raw_metrics.txt

@@ -1,7 +1,7 @@
 # config.yaml - Configuration for the Infra Health Dashboard pipeline
 # CS 3030 - Project 7: Final Capstone
 
-# TODO: fill in real values as the pipeline comes together.
+# Runtime values used by the completed monitoring pipeline.
 # This is read by orchestrator.sh's load_config() function.
 
 # Path where the Bash collector writes its raw output
@@ -13,8 +13,8 @@ health_report_path: "health.json"
 # Path to the log directory the collector should measure
 log_directory: /var/log
 
-# TODO: add threshold values here if you'd rather configure them
-# than hardcode them in processor.py, e.g.:
+# Thresholds are currently implemented in processor.py.
+# Example configuration for a future enhancement:
 # thresholds:
 #   disk_usage_percent: 85
 #   cpu_load_1min: 4.0
