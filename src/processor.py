@@ -253,7 +253,7 @@ class Processor:
         """
         Write results as CSV.
 
-        TODO: Adapt the columns and rows to match your results structure.
+        Each result field is written as a field/value row.
         """
         import csv  # local import — only needed for this format
 
@@ -267,7 +267,7 @@ class Processor:
         """
         Write results as a human-readable text report.
 
-        TODO: Customise this to produce the report your project requires.
+        The report contains a readable summary of every processed result field.
         """
         lines = [
             "=" * 60,
@@ -338,9 +338,7 @@ Examples:
         dest="output_format",
         help="Output format (default: json).",
     )
-    # TODO: Add any additional arguments your project needs. Examples:
-    #   parser.add_argument("--threshold", type=float, default=0.8)
-    #   parser.add_argument("--dry-run", action="store_true")
+    # The implemented CLI options cover the current project requirements.
 
     return parser.parse_args(argv)
 
