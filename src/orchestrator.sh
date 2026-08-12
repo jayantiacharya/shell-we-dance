@@ -181,8 +181,8 @@ load_config() {
 # Returns: prints the disk usage percentage (e.g. "42")
 collect_disk_usage() {
     local pct
-    log_debug "Raw df output: $(df /)"
-    pct=$(df / | awk 'NR==2 {gsub("%","",$5); print $5}')
+    log_debug "Raw df output: $(df -P /)"
+    pct=$(df -P / | awk 'NR==2 { for (i=1; i<=NF; i++) if ($i ~ /%$/) { gsub("%","",$i); print $i } }')
     echo "$pct"
 }
 
