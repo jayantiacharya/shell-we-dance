@@ -1,12 +1,12 @@
 {
-  "timestamp": "2026-09-05T23:13:10.807115+00:00",
+  "timestamp": "2026-09-06T00:50:29.402549+00:00",
   "input": "raw_metrics.txt",
   "items_processed": 6,
   "errors": [],
   "metrics": {
     "disk_usage_percent": 82,
-    "cpu_load_1min": 1.52,
-    "process_count": 146,
+    "cpu_load_1min": 0.35,
+    "process_count": 138,
     "log_size_kb": 0,
     "docker_available": true,
     "docker_container_count": 0
